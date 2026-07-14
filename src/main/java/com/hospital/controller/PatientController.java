@@ -11,7 +11,7 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/patients")
 //@CrossOrigin(origins = "http://localhost:5173")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://hospitalmanagementsystem-virid.vercel.app")
 public class PatientController {
 
     private final PatientService patientService;
