@@ -1,10 +1,8 @@
 import axios from 'axios';
 
-// const API_BASE_URL = 'http://localhost:8080/api';
-
-// Create an axios instance configured with your backend's Basic Authentication
+// Fallback to localhost automatically if the environment variable points to a dead end or cloud instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: 'http://localhost:8080/api', // Forces local Spring Boot server port 8080 directly
   headers: {
     'Content-Type': 'application/json',
   },

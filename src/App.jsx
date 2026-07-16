@@ -2,10 +2,30 @@ import React, { useState } from 'react';
 import PatientManager from './components/PatientManager';
 import DoctorManager from './components/DoctorManager';
 import AppointmentManager from './components/AppointmentManager';
+import Login from './components/Login'; // Importing our sliding layout component
 
 function App() {
+  // Check if session token persists or default to unauthenticated landing entry
+  const [isLoggedIn, setIsLoggedIn] = useState(localStorage.getItem('isAuthenticated') === 'true');
   const [activeTab, setActiveTab] = useState('patients');
 
+  // Callback function to let Login.jsx signal a successful sign-in state change
+  const handleLoginSuccess = () => {
+    setIsLoggedIn(true);
+  };
+
+  // Callback function to sign out and clear session state context
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    setIsLoggedIn(false);
+  };
+
+  // GROUND FLOOR GUARD ROUTE: Render the beautiful sliding login page if not logged in
+  if (!isLoggedIn) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // CORE DASHBOARD WORKSPACE (Rendered only after authentication succeeds)
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f4f6f9', fontFamily: '"Segoe UI", Roboto, sans-serif', margin: 0 }}>
       
@@ -57,6 +77,20 @@ function App() {
             }}
           >
             <span>📅</span> Appointments
+          </button>
+
+          {/* DYNAMIC SIGN OUT LINK */}
+          <button 
+            onClick={handleLogout} 
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px',
+              backgroundColor: 'transparent',
+              color: '#ef4444',
+              border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+              textAlign: 'left', transition: 'all 0.2s ease', marginTop: '20px'
+            }}
+          >
+            <span>🚪</span> Sign Out
           </button>
         </nav>
 

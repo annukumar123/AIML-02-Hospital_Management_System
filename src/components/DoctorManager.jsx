@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { doctorService } from '../services/api';
+import { doctorService, appointmentService } from '../services/api';
 
 const DoctorManager = () => {
   const [doctors, setDoctors] = useState([]);
+  const [appointments, setAppointments] = useState([]); // Added to fetch live schedule data matches
+  const [expandedDoctorId, setExpandedDoctorId] = useState(null); // Tracks which doctor schedule is viewable
   const [formData, setFormData] = useState({ doctorName: '', specialization: '' });
   const [editId, setEditId] = useState(null);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     loadDoctors();
+    loadAppointments();
   }, []);
 
   const loadDoctors = async () => {
@@ -17,6 +20,15 @@ const DoctorManager = () => {
       setDoctors(response.data);
     } catch (error) {
       console.error("Error loading doctors:", error);
+    }
+  };
+
+  const loadAppointments = async () => {
+    try {
+      const response = await appointmentService.getAll();
+      setAppointments(response.data);
+    } catch (error) {
+      console.error("Error cross-referencing ledger appointments:", error);
     }
   };
 
@@ -37,7 +49,8 @@ const DoctorManager = () => {
       setFormData({ doctorName: '', specialization: '' });
       setEditId(null);
       loadDoctors();
-      setTimeout(() => setMessage(''), 4000); // Clear message automatically
+      loadAppointments(); // Refresh schedules
+      setTimeout(() => setMessage(''), 4000);
     } catch (error) {
       setMessage("Operation failed.");
     }
@@ -49,6 +62,7 @@ const DoctorManager = () => {
         await doctorService.delete(id);
         setMessage("Doctor profile deleted.");
         loadDoctors();
+        loadAppointments();
         setTimeout(() => setMessage(''), 4000);
       } catch (error) {
         console.error("Error deleting doctor:", error);
@@ -56,7 +70,10 @@ const DoctorManager = () => {
     }
   };
 
-  // Cohesive layout design styles 
+  const toggleExpandDoctor = (doctorId) => {
+    setExpandedDoctorId(expandedDoctorId === doctorId ? null : doctorId);
+  };
+
   const inputStyle = {
     width: '100%',
     padding: '12px 14px',
@@ -108,8 +125,8 @@ const DoctorManager = () => {
         </form>
       </div>
 
-      {/* COLUMN 2: ROSTER VIEW TABLE CARD */}
-      <div style={{ backgroundColor: '#ffffff', padding: '25px', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', border: '1px solid #f1f5f9', overflowX: 'auto' }}>
+      {/* COLUMN 2: ROSTER VIEW TABLE CARD WITH EMBEDDED SCHEDULES */}
+      <div style={{ backgroundColor: '#ffffff', padding: '25px', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05)', border: '1px solid #f1f5f9' }}>
         <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>📋 Credentialed Medical Staff</h3>
         
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
@@ -129,25 +146,71 @@ const DoctorManager = () => {
                 </td>
               </tr>
             ) : (
-              doctors.map(d => (
-                <tr key={d.doctorId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '14px 10px', color: '#64748b', fontWeight: '600' }}>MD#{d.doctorId}</td>
-                  <td style={{ padding: '14px 10px', color: '#0f172a', fontWeight: '500' }}>{d.doctorName}</td>
-                  <td style={{ padding: '14px 10px' }}>
-                    <span style={{ background: '#f0fdf4', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
-                      {d.specialization}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 10px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button onClick={() => { setEditId(d.doctorId); setFormData({ doctorName: d.doctorName, specialization: d.specialization }); }} style={{ background: '#fef3c7', color: '#d97706', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(d.doctorId)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
+              doctors.map(d => {
+                // Filter appointments dynamically by matching doctorId references
+                const assignedPatients = appointments.filter(a => a.doctor && a.doctor.doctorId === d.doctorId);
+                const isExpanded = expandedDoctorId === d.doctorId;
+
+                return (
+                  <React.Fragment key={d.doctorId}>
+                    <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9', backgroundColor: isExpanded ? '#f8fafc' : 'transparent' }}>
+                      <td style={{ padding: '14px 10px', color: '#64748b', fontWeight: '600' }}>MD#{d.doctorId}</td>
+                      <td style={{ padding: '14px 10px', color: '#0f172a', fontWeight: '500' }}>{d.doctorName}</td>
+                      <td style={{ padding: '14px 10px' }}>
+                        <span style={{ background: '#f0fdf4', color: '#166534', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+                          {d.specialization}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 10px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button onClick={() => toggleExpandDoctor(d.doctorId)} style={{ background: isExpanded ? '#e0e7ff' : '#eff6ff', color: isExpanded ? '#4338ca' : '#1d4ed8', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                          📅 Slots ({assignedPatients.length})
+                        </button>
+                        <button onClick={() => { setEditId(d.doctorId); setFormData({ doctorName: d.doctorName, specialization: d.specialization }); }} style={{ background: '#fef3c7', color: '#d97706', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                          Edit
+                        </button>
+                        <button onClick={() => handleDelete(d.doctorId)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                    
+                    {/* EXPANDABLE SCHEDULE CORRIDOR VIEW */}
+                    {isExpanded && (
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                        <td colSpan="4" style={{ padding: '0 20px 15px 20px' }}>
+                          <div style={{ background: '#ffffff', borderRadius: '10px', padding: '14px', border: '1px solid #e2e8f0', boxShadow: 'inset 0 2px 4px 0 rgba(0,0,0,0.02)' }}>
+                            <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#475569', fontWeight: '700' }}>
+                              🗓️ Active Patient Schedule Load for {d.doctorName}
+                            </h4>
+                            {assignedPatients.length === 0 ? (
+                              <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                No patient consultation allocations committed for this practitioner today.
+                              </p>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {assignedPatients.map((ap, idx) => (
+  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
+    <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>👤 {ap.patientName}</span>
+    <div style={{ display: 'flex', gap: '6px' }}>
+      {/* 📅 Display the custom targeted day selection */}
+      <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '600' }}>
+        📅 {ap.appointmentDay}
+      </span>
+      <span style={{ background: '#f5f3ff', color: '#6d28d9', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '600' }}>
+        ⏰ {ap.appointmentDate}
+      </span>
+    </div>
+  </div>
+))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
